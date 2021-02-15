@@ -7,6 +7,7 @@ written in Python3 by Judith van Stegeren, @jd7h
 
 #import twitter #for docs, see https://python-twitter.readthedocs.io/en/latest/twitter.html
 import nltk
+nltk.download('averaged_perceptron_tagger')
 import tweepy
 import logging
 #from config import create_api
@@ -39,12 +40,28 @@ def check_mentions(api, keywords, since_id):
     new_since_id = since_id
     for tweet in tweepy.Cursor(api.mentions_timeline,
         since_id=since_id).items():
+        #logger.info(f"Text is {tweet.text}")
         new_since_id = max(tweet.id, new_since_id)
         if tweet.in_reply_to_status_id is not None:
             continue
         if any(keyword in tweet.text.lower() for keyword in keywords):
             logger.info(f"Answering to {tweet.user.name}")
-            logger.info(f"Message is {tweet.text.lower()}")
+            print(str(tweet.text))
+            text = tweet.text[8:]
+            tknzr = nltk.tokenize.TweetTokenizer()
+            tokens = tknzr.tokenize(text)
+            print(f"after tokenize {tokens}")
+            
+            print(nltk.pos_tag(tokens))
+
+            SA = nltk.sentiment.vader.SentimentIntensityAnalyzer()
+            SA.polarity_scores(text)
+            print(SA)
+
+            
+
+
+
             #if not tweet.user.following:
             #    tweet.user.follow()
             try:
@@ -70,7 +87,7 @@ def main():
     while True:
         since_id = check_mentions(api, ["help", "support"], since_id)
         logger.info("Waiting...")
-        time.sleep(10)
+        time.sleep(30)
 
 if __name__ == "__main__":
     main()
