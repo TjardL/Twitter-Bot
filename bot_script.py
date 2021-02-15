@@ -4,11 +4,16 @@ USE AT YOUR OWN PERIL <3
 fill in your API keys before running the script
 written in Python3 by Judith van Stegeren, @jd7h
 '''
+
+#import twitter #for docs, see https://python-twitter.readthedocs.io/en/latest/twitter.html
+import nltk
+import tweepy
+import logging
+#from config import create_api
 import time
-import twitter #for docs, see https://python-twitter.readthedocs.io/en/latest/twitter.html
 
-
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 '''
 before running the script, do this:
@@ -24,58 +29,49 @@ $ pip install python-twitter
 def twitter_demo():
     # connect to api with apikeys
     # if you don't have apikeys, go to apps.twitter.com
-    api = twitter.Api(consumer_key='i43i0N9plzAa7wf4huwpxsvcN',
-                      consumer_secret='V7yAapEx33sxfR3HKTYYQVWlWdZA3acVVDynkXPau39BdK4V0M',
-                      access_token_key='1360611491611869184-0OfpGHTFo9JYA3ZIaqJIKMNFdmPzve',
-                      access_token_secret='r45sGkAn1Y6c4GZZjbuxnmBbEVJB2DolDXapNab2ZVfL4')
-
-    # get followers
-    print("Getting a list of accounts I follow on Twitter...")
-    friends = api.GetFriends()
-    friend_ids = [friend.id for friend in friends]
-    for friend in friends:
-        print("Friend: ", friend.name, friend.screen_name, friend.id)
+    tknzr = nltk.tokenize.TweetTokenizer()
+    myString = "This is a cooool #dummysmiley: :-) :-P <3"
     
-    # get a list of accounts that are following me
-    print("Getting a list of followers from Twitter...")
-    followers = api.GetFollowers()
-    followers_ids = [user.id for user in followers]
-    for follower in followers:
-        print("Follower: ", follower.name, follower.screen_name, follower.id)
+    print(tknzr.tokenize(myString))
 
-    # look up the user_id of a single user
-    print("Looking up the details of screenname @jd7h...")
-    print(api.UsersLookup(screen_name=["jd7h"]))
-    # this should output: [User(ID=222060384, ScreenName=jd7h)]
+def check_mentions(api, keywords, since_id):
+    logger.info("Retrieving mentions")
+    new_since_id = since_id
+    for tweet in tweepy.Cursor(api.mentions_timeline,
+        since_id=since_id).items():
+        new_since_id = max(tweet.id, new_since_id)
+        if tweet.in_reply_to_status_id is not None:
+            continue
+        if any(keyword in tweet.text.lower() for keyword in keywords):
+            logger.info(f"Answering to {tweet.user.name}")
+            logger.info(f"Message is {tweet.text.lower()}")
+            #if not tweet.user.following:
+            #    tweet.user.follow()
+            try:
+                api.update_status(
+    
+                    status= "@%s Hello!" % (tweet.user.screen_name),
+                    in_reply_to_status_id=tweet.id,
+                )
+            except tweepy.TweepError as e:
+                print(e.reason)
+    return new_since_id
 
-    #tweeting
-    body = "This is a tweet. Chirp chirp. Hello world!"
-    print("Posting tweet...")
-    result = api.PostUpdate(body)    
+def main():
+    # Authenticate to Twitter
+    auth = tweepy.OAuthHandler("i43i0N9plzAa7wf4huwpxsvcN", "V7yAapEx33sxfR3HKTYYQVWlWdZA3acVVDynkXPau39BdK4V0M")
+    auth.set_access_token("1360611491611869184-0OfpGHTFo9JYA3ZIaqJIKMNFdmPzve", "r45sGkAn1Y6c4GZZjbuxnmBbEVJB2DolDXapNab2ZVfL4")
 
-    # mentions:
-    body = "@jd7h My Twitter bot is working!"
-    print("Posting tweet with mention...")
-    result = api.PostUpdate(body) # including the screenname (prepended by a '@') in the tweet-body is enough to create a mention.
-
-    # replying to a tweet:
-    itech_tweet_id = 1178660081648492545 # tweet id of the tweet https://twitter.com/jd7h/status/1178660081648492545
-    body = "I ran your script without changing some of the input strings!"
-    print("Posting reply...")
-    result = api.PostUpdate(body, in_reply_to_status_id=itech_tweet_id, auto_populate_reply_metadata=True)
-
-    # other useful stuff:
-    # creating a private list
-    print("Creating a private list...")
-    mylist = api.CreateList(name="My beautiful list",mode="private",description=("A secret list I created on " + time.strftime("%Y-%m-%d")))
-
-    # Add all users from 'Following' to the new list
-    #print("Adding friends to the newly created list...")
-    #for friend_id in friend_ids:
-    #  print("Adding ", friend_id)
-    #  result = api.CreateListsMember(list_id=mylist.id,user_id=friend_id)
-      
-
+    # Create API object
+    api = tweepy.API(auth, wait_on_rate_limit=True,
+    wait_on_rate_limit_notify=True)
+    #api = create_api()
+    since_id = 1
+    while True:
+        since_id = check_mentions(api, ["help", "support"], since_id)
+        logger.info("Waiting...")
+        time.sleep(10)
 
 if __name__ == "__main__":
-    twitter_demo()
+    main()
+
